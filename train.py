@@ -59,7 +59,7 @@ parser.add_argument('--num_instances', type=int, default=4,
                     help="number of instances per identity")
 # Architecture
 parser.add_argument('-a', '--arch', type=str, default='ap3dres50', 
-                    help="ap3dres50, ap3dnlres50")
+                    help="ap3dres50, ap3dnlres50, ap3dres34, ap3dres18")
 # Miscs
 parser.add_argument('--seed', type=int, default=1)
 parser.add_argument('--resume', type=str, default='', metavar='PATH')
