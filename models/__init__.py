@@ -1,3 +1,4 @@
+
 from __future__ import absolute_import
 
 from .ResNet import *
@@ -5,6 +6,8 @@ from .ResNet import *
 __factory = {
     'ap3dres50': AP3DResNet50,
     'ap3dnlres50': AP3DNLResNet50,
+    'ap3dres34': AP3DResNet34,
+    'ap3dres18': AP3DResNet18,
 }
 
 def get_names():

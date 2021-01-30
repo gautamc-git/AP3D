@@ -27,7 +27,7 @@ from tools.eval_metrics import evaluate
 
 parser = argparse.ArgumentParser(description='Test AP3D using all frames')
 # Datasets
-parser.add_argument('--root', type=str, default='/home/guxinqian/data/')
+parser.add_argument('--root', type=str, default='data/')
 parser.add_argument('-d', '--dataset', type=str, default='mars',
                     choices=data_manager.get_names())
 parser.add_argument('-j', '--workers', default=4, type=int)
@@ -84,7 +84,7 @@ def main():
     print("Model size: {:.5f}M".format(sum(p.numel() for p in model.parameters())/1000000.0))
 
     for epoch in args.test_epochs:
-        model_path = osp.join(args.resume, 'checkpoint_ep'+str(epoch)+'.pth.tar')
+        model_path = osp.join(args.resume, 'best_model.pth.tar')
         print("Loading checkpoint from '{}'".format(model_path))
         checkpoint = torch.load(model_path)
         model.load_state_dict(checkpoint['state_dict'])

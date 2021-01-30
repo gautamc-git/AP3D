@@ -10,6 +10,7 @@ import datetime
 import argparse
 import os.path as osp
 import numpy as np
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -29,7 +30,7 @@ from tools.samplers import RandomIdentitySampler
 
 parser = argparse.ArgumentParser(description='Train AP3D')
 # Datasets
-parser.add_argument('--root', type=str, default='/home/guxinqian/data/')
+parser.add_argument('--root', type=str, default='data/')
 parser.add_argument('-d', '--dataset', type=str, default='mars',
                     choices=data_manager.get_names())
 parser.add_argument('-j', '--workers', default=4, type=int)
@@ -46,6 +47,7 @@ parser.add_argument('--start_epoch', default=0, type=int)
 parser.add_argument('--train_batch', default=32, type=int)
 parser.add_argument('--test_batch', default=32, type=int)
 parser.add_argument('--lr', default=0.0003, type=float)
+parser.add_argument('--temp', default=4, type=int)
 parser.add_argument('--stepsize', default=[60, 120, 180], nargs='+', type=int,
                     help="stepsize to decay learning rate")
 parser.add_argument('--gamma', default=0.1, type=float,
@@ -59,7 +61,7 @@ parser.add_argument('--num_instances', type=int, default=4,
                     help="number of instances per identity")
 # Architecture
 parser.add_argument('-a', '--arch', type=str, default='ap3dres50', 
-                    help="ap3dres50, ap3dnlres50")
+                    help="ap3dres50, ap3dnlres50, ap3dres34, ap3dres18")
 # Miscs
 parser.add_argument('--seed', type=int, default=1)
 parser.add_argument('--resume', type=str, default='', metavar='PATH')
@@ -133,7 +135,7 @@ def main():
         pin_memory=pin_memory, drop_last=False)
 
     print("Initializing model: {}".format(args.arch))
-    model = models.init_model(name=args.arch, num_classes=dataset.num_train_pids)
+    model = models.init_model(name=args.arch, num_classes=dataset.num_train_pids, temperature = args.temp)
     print("Model size: {:.5f}M".format(sum(p.numel() for p in model.parameters())/1000000.0))
 
     criterion_xent = nn.CrossEntropyLoss()
@@ -160,13 +162,13 @@ def main():
     print("==> Start training")
 
     for epoch in range(start_epoch, args.max_epoch):
-        scheduler.step()
 
         start_train_time = time.time()
         train(epoch, model, criterion_xent, criterion_htri, optimizer, trainloader, use_gpu)
         train_time += round(time.time() - start_train_time)
 
-        
+        scheduler.step()
+   
         if (epoch+1) >= args.start_eval and args.eval_step > 0 and (epoch+1) % args.eval_step == 0 or (epoch+1) == args.max_epoch:
             print("==> Test")
             with torch.no_grad():
@@ -205,7 +207,7 @@ def train(epoch, model, criterion_xent, criterion_htri, optimizer, trainloader, 
     model.train()
 
     end = time.time()
-    for batch_idx, (vids, pids, _) in enumerate(trainloader):
+    for batch_idx, (vids, pids, _) in enumerate(tqdm(trainloader)):
         if (pids-pids[0]).sum() == 0:
             # can't compute triplet loss
             continue
@@ -263,7 +265,7 @@ def test(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20]):
     model.eval()
 
     qf, q_pids, q_camids = [], [], []
-    for batch_idx, (vids, pids, camids) in enumerate(queryloader):
+    for batch_idx, (vids, pids, camids) in enumerate(tqdm(queryloader)):
         if use_gpu:
             vids = vids.cuda()
         feat = model(vids)
@@ -281,7 +283,7 @@ def test(model, queryloader, galleryloader, use_gpu, ranks=[1, 5, 10, 20]):
     print("Extracted features for query set, obtained {} matrix".format(qf.shape))
 
     gf, g_pids, g_camids = [], [], []
-    for batch_idx, (vids, pids, camids) in enumerate(galleryloader):
+    for batch_idx, (vids, pids, camids) in enumerate(tqdm(galleryloader)):
         if use_gpu:
             vids = vids.cuda()
         feat = model(vids)

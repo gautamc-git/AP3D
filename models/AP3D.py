@@ -409,3 +409,46 @@ class APP3DC(nn.Module):
         out = out + residual
 
         return out
+
+class APP3DD(nn.Module):
+    def __init__(self, conv2d, time_dim=3, time_stride=1, temperature=4, contrastive_att=True):
+        super(APP3DD, self).__init__()
+
+        self.APM = APM(conv2d.out_channels, conv2d.out_channels//16, \
+                       time_dim=time_dim, temperature=temperature, contrastive_att=contrastive_att)
+
+        # spatial conv3d kernel
+        kernel_dim = (1, conv2d.kernel_size[0], conv2d.kernel_size[1])
+        stride = (1, conv2d.stride[0], conv2d.stride[0])
+        padding = (0, conv2d.padding[0], conv2d.padding[1])
+        self.spatial_conv3d = nn.Conv3d(conv2d.in_channels, conv2d.out_channels, \
+                                        kernel_size=kernel_dim, padding=padding, \
+                                        stride=stride, bias=conv2d.bias)
+
+        # init the parameters of spatial_conv3d
+        weight_2d = conv2d.weight.data
+        weight_3d = torch.zeros(*weight_2d.shape)
+        weight_3d = weight_3d.unsqueeze(2)
+        weight_3d[:, :, 0, :, :] = weight_2d
+        self.spatial_conv3d.weight = nn.Parameter(weight_3d)
+        self.spatial_conv3d.bias = conv2d.bias
+        self.residual_weight=torch.nn.Parameter(torch.tensor(0.9,requires_grad=True))
+
+
+        # temporal conv3d kernel
+        kernel_dim = (time_dim, 1, 1)
+        stride = (time_stride*time_dim, 1, 1)
+        padding = (0, 0, 0)
+        self.temporal_conv3d = nn.Conv3d(conv2d.out_channels, conv2d.out_channels, \
+                                         kernel_size=kernel_dim, padding=padding, \
+                                         stride=stride, bias=False)
+
+        # init the parameters of temporal_conv3d
+        nn.init.constant_(self.temporal_conv3d.weight, 0)
+
+
+    def forward(self, x):
+        out = self.spatial_conv3d(x)
+        residual = self.temporal_conv3d(self.APM(out))
+        out = out*(1-self.residual_weight) + residual*self.residual_weight
+        return out
